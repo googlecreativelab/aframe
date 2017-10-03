@@ -39,7 +39,6 @@ module.exports = registerElement('a-scene', {
   prototype: Object.create(AEntity.prototype, {
     defaultComponents: {
       value: {
-        'canvas': '',
         'inspector': '',
         'keyboard-shortcuts': '',
         'screenshot': '',
@@ -67,10 +66,9 @@ module.exports = registerElement('a-scene', {
         this.hasLoaded = false;
         this.isPlaying = false;
         this.originalHTML = this.innerHTML;
-        this.addEventListener('render-target-loaded', function () {
-          this.setupRenderer();
-          this.resize();
-        });
+        setupCanvas(this);
+        this.setupRenderer();
+        this.resize();
         this.addFullScreenStyles();
         initPostMessageAPI(this);
       },
@@ -341,12 +339,12 @@ module.exports = registerElement('a-scene', {
 
     setupRenderer: {
       value: function () {
-        var canvas = this.canvas;
         // Set at startup. To enable/disable antialias
         // at runttime we would have to recreate the whole context
         var antialias = this.getAttribute('antialias') === 'true';
-        var renderer = this.renderer = new THREE.WebGLRenderer({
-          canvas: canvas,
+        var renderer;
+        renderer = this.renderer = new THREE.WebGLRenderer({
+          canvas: this.canvas,
           antialias: antialias || window.hasNativeWebVRImplementation,
           alpha: true
         });
@@ -517,5 +515,42 @@ function exitFullscreen () {
     document.mozCancelFullScreen();
   } else if (document.webkitExitFullscreen) {
     document.webkitExitFullscreen();
+  }
+}
+
+function setupCanvas (sceneEl) {
+  var canvasEl;
+
+  canvasEl = document.createElement('canvas');
+  canvasEl.classList.add('a-canvas');
+  // Mark canvas as provided/injected by A-Frame.
+  canvasEl.dataset.aframeCanvas = true;
+  sceneEl.appendChild(canvasEl);
+
+  document.addEventListener('fullscreenchange', onFullScreenChange);
+  document.addEventListener('mozfullscreenchange', onFullScreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullScreenChange);
+
+  // Prevent overscroll on mobile.
+  canvasEl.addEventListener('touchmove', function (event) {
+    event.preventDefault();
+  });
+
+  // Set canvas on scene.
+  sceneEl.canvas = canvasEl;
+  sceneEl.emit('render-target-loaded', {target: canvasEl});
+  // For unknown reasons a synchronous resize does not work on desktop when
+  // entering/exiting fullscreen.
+  setTimeout(bind(sceneEl.resize, sceneEl), 0);
+
+  function onFullScreenChange () {
+    var fullscreenEl =
+      document.fullscreenElement ||
+      document.mozFullScreenElement ||
+      document.webkitFullscreenElement;
+    // No fullscren element === exit fullscreen
+    if (!fullscreenEl) { sceneEl.exitVR(); }
+    document.activeElement.blur();
+    document.body.focus();
   }
 }
