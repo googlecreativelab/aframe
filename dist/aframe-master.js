@@ -70879,6 +70879,7 @@ module.exports.repeats = REPEATS;
 module.exports = {
   AFRAME_INJECTED: 'aframe-injected',
   DEFAULT_CAMERA_HEIGHT: 1.6,
+  DEFAULT_HANDEDNESS: 'right',
   animation: _dereq_('./animation'),
   keyboardevent: _dereq_('./keyboardevent')
 };
@@ -74401,8 +74402,8 @@ function setupCanvas (sceneEl) {
   document.addEventListener('webkitfullscreenchange', onFullScreenChange);
 
   // Prevent overscroll on mobile.
-  canvasEl.addEventListener('touchmove', function (event) { 
-    event.preventDefault(); 
+  canvasEl.addEventListener('touchmove', function (event) {
+    event.preventDefault();
   });
 
   // Set canvas on scene.
@@ -74423,6 +74424,7 @@ function setupCanvas (sceneEl) {
     document.body.focus();
   }
 }
+
 },{"../../lib/three":144,"../../utils/":165,"../a-entity":94,"../a-node":96,"../a-register-element":97,"../system":108,"./metaTags":102,"./postMessage":103,"./scenes":104,"./wakelock":105,"tween.js":48}],102:[function(_dereq_,module,exports){
 var constants = _dereq_('../../constants/');
 var extend = _dereq_('../../utils').extend;
@@ -75941,7 +75943,7 @@ _dereq_('./core/a-mixin');
 _dereq_('./extras/components/');
 _dereq_('./extras/primitives/');
 
-console.log('A-Frame Version: 0.5.0 (Date 03-10-2017, Commit #d67463d)');
+console.log('A-Frame Version: 0.5.0 (Date 03-10-2017, Commit #e83d220)');
 console.log('three Version:', pkg.dependencies['three']);
 console.log('WebVR Polyfill Version:', pkg.dependencies['webvr-polyfill']);
 
@@ -77236,47 +77238,60 @@ function fixVideoAttributes (videoEl) {
 
 },{"../core/system":108,"../lib/three":144,"../utils/":165}],158:[function(_dereq_,module,exports){
 var registerSystem = _dereq_('../core/system').registerSystem;
-var trackedControlsUtils = _dereq_('../utils/tracked-controls');
-var utils = _dereq_('../utils');
 
 /**
  * Tracked controls system.
- * It maintains a list with the available tracked controllers
+ * Maintain list with available tracked controllers.
  */
 module.exports.System = registerSystem('tracked-controls', {
   init: function () {
     var self = this;
+
     this.controllers = [];
-    this.lastControllersUpdate = 0;
-    // Throttle the (renamed) tick handler to minimum 10ms interval.
-    this.tick = utils.throttle(this.throttledTick, 10, this);
+
+    this.updateControllerList();
+
     if (!navigator.getVRDisplays) { return; }
-    navigator.getVRDisplays().then(function (displays) {
-      if (displays.length > 0) {
-        self.vrDisplay = displays[0];
-      }
+
+    this.sceneEl.addEventListener('enter-vr', function () {
+      navigator.getVRDisplays().then(function (displays) {
+        if (displays.length) { self.vrDisplay = displays[0]; }
+      });
     });
   },
 
-  updateControllerList: function () {
-    var controllers = this.controllers = [];
-    var gamepads = trackedControlsUtils.getGamepadsByPrefix('');
-    for (var i = 0; i < gamepads.length; i++) {
-      var gamepad = gamepads[i];
-      if (gamepad && gamepad.pose) { controllers.push(gamepad); }
-    }
+  tick: function () {
+    this.updateControllerList();
   },
 
   /**
-   * Update controller list every 10 millseconds.
+   * Update controller list.
    */
-  throttledTick: function () {
-    this.updateControllerList();
-    this.sceneEl.emit('controllersupdated', { controllers: this.controllers });
+  updateControllerList: function () {
+    var controllers = this.controllers;
+    var gamepad;
+    var gamepads;
+    var i;
+    var prevCount;
+
+    gamepads = navigator.getGamepads && navigator.getGamepads();
+    if (!gamepads) { return; }
+
+    prevCount = controllers.length;
+    controllers.length = 0;
+    for (i = 0; i < gamepads.length; ++i) {
+      gamepad = gamepads[i];
+      if (gamepad && gamepad.pose) {
+        controllers.push(gamepad);
+      }
+    }
+
+    if (controllers.length !== prevCount) {
+      this.el.emit('controllersupdated', undefined, false);
+    }
   }
 });
-
-},{"../core/system":108,"../utils":165,"../utils/tracked-controls":169}],159:[function(_dereq_,module,exports){
+},{"../core/system":108}],159:[function(_dereq_,module,exports){
 /**
  * Faster version of Function.prototype.bind
  * @param {Function} fn - Function to wrap.
@@ -78179,69 +78194,159 @@ function transformKeysToCamelCase (obj) {
 module.exports.transformKeysToCamelCase = transformKeysToCamelCase;
 
 },{"style-attr":36}],169:[function(_dereq_,module,exports){
-/**
- * Return enumerated gamepads matching id prefix.
- *
- * @param {object} idPrefix - prefix to match in gamepad id, if any.
- */
-module.exports.getGamepadsByPrefix = function (idPrefix) {
-  var gamepadsList = [];
-  var gamepad;
-  var gamepads = navigator.getGamepads && navigator.getGamepads();
-  if (!gamepads) { return gamepadsList; }
+var DEFAULT_HANDEDNESS = _dereq_('../constants').DEFAULT_HANDEDNESS;
+var AXIS_LABELS = ['x', 'y', 'z', 'w'];
+var NUM_HANDS = 2; // Number of hands in a pair. Should always be 2.
 
-  for (var i = 0; i < gamepads.length; ++i) {
-    gamepad = gamepads[i];
-    // need to check that gamepad is valid, since browsers may return array of null values
-    if (gamepad) {
-      if (!idPrefix || gamepad.id.indexOf(idPrefix) === 0) {
-        gamepadsList.push(gamepad);
-      }
-    }
+/**
+ * Called on controller component `.play` handlers.
+ * Check if controller matches parameters and inject tracked-controls component.
+ * Handle event listeners.
+ * Generate controllerconnected or controllerdisconnected events.
+ *
+ * @param {object} component - Tracked controls component.
+ * @param {object} idPrefix - Prefix to match in gamepad id if any.
+ * @param {object} queryObject - Map of values to match.
+ */
+module.exports.checkControllerPresentAndSetup = function (component, idPrefix, queryObject) {
+  var el = component.el;
+  var isPresent = isControllerPresent(component, idPrefix, queryObject);
+
+  // If component was previously paused and now playing, re-add event listeners.
+  // Handle the event listeners here since this helper method is control of calling
+  // `.addEventListeners` and `.removeEventListeners`.
+  if (component.controllerPresent && !component.controllerEventsActive) {
+    component.addEventListeners();
   }
-  return gamepadsList;
+
+  // Nothing changed, no need to do anything.
+  if (isPresent === component.controllerPresent) { return isPresent; }
+
+  component.controllerPresent = isPresent;
+
+  // Update controller presence.
+  if (isPresent) {
+    component.injectTrackedControls();
+    component.addEventListeners();
+    el.emit('controllerconnected', {name: component.name, component: component});
+  } else {
+    component.removeEventListeners();
+    el.emit('controllerdisconnected', {name: component.name, component: component});
+  }
 };
 
 /**
- * Enumerate controllers (as built by system tick, e.g. that have pose) and check if they match parameters.
+ * Enumerate controller (that have pose) and check if they match parameters.
  *
- * @param {object} sceneEl - the scene element.
- * @param {object} idPrefix - prefix to match in gamepad id, if any.
- * @param {object} queryObject - map of values to match (hand; index among controllers with idPrefix)
+ * @param {object} component - Tracked controls component.
+ * @param {object} idPrefix - Prefix to match in gamepad id if any.
+ * @param {object} queryObject - Map of values to match.
  */
-module.exports.isControllerPresent = function (sceneEl, idPrefix, queryObject) {
-  var isPresent = false;
-  var index = 0;
-  var gamepad;
-  var isPrefixMatch;
+function isControllerPresent (component, idPrefix, queryObject) {
   var gamepads;
-  var trackedControlsSystem = sceneEl && sceneEl.systems['tracked-controls'];
-  if (!trackedControlsSystem) { return isPresent; }
+  var sceneEl = component.sceneEl;
+  var trackedControlsSystem;
+  var filterControllerIndex = queryObject.index || 0;
+
+  if (!idPrefix) { return false; }
+
+  trackedControlsSystem = sceneEl && sceneEl.systems['tracked-controls'];
+  if (!trackedControlsSystem) { return false; }
+
   gamepads = trackedControlsSystem.controllers;
-  if (!gamepads || gamepads.length === 0) {
-    trackedControlsSystem.updateControllerList();
-    gamepads = trackedControlsSystem.controllers;
-  }
-  if (!gamepads) { return isPresent; }
+  if (!gamepads.length) { return false; }
 
-  for (var i = 0; i < gamepads.length; ++i) {
-    gamepad = gamepads[i];
-    isPrefixMatch = (!idPrefix || idPrefix === '' || gamepad.id.indexOf(idPrefix) === 0);
-    isPresent = isPrefixMatch;
-    if (isPresent && queryObject.hand) {
-      isPresent = gamepad.hand === queryObject.hand;
+  return !!findMatchingController(gamepads, null, idPrefix, queryObject.hand, filterControllerIndex);
+}
+
+module.exports.isControllerPresent = isControllerPresent;
+
+/**
+ * Walk through the given controllers to find any where the device ID equals filterIdExact, or startWith filterIdPrefix.
+ * A controller where this considered true is considered a 'match'.
+ *
+ * For each matching controller:
+ *   If filterHand is set, and the controller:
+ *     is handed, we further verify that controller.hand equals filterHand.
+ *     is unhanded (controller.hand is ''), we skip until we have found a number of matching controllers that equals filterControllerIndex
+ *   If filterHand is not set, we skip until we have found the nth matching controller, where n equals filterControllerIndex
+ *
+ * The method should be called with one of: [filterIdExact, filterIdPrefix] AND one or both of: [filterHand, filterControllerIndex]
+ *
+ * @param {object} controllers - Array of gamepads to search
+ * @param {string} filterIdExact - If set, used to find controllers with id === this value
+ * @param {string} filterIdPrefix - If set, used to find controllers with id startsWith this value
+ * @param {object} filterHand - If set, further filters controllers with matching 'hand' property
+ * @param {object} filterControllerIndex - Find the nth matching controller, where n equals filterControllerIndex. defaults to 0.
+ */
+function findMatchingController (controllers, filterIdExact, filterIdPrefix, filterHand, filterControllerIndex) {
+  var controller;
+  var i;
+  var matchingControllerOccurence = 0;
+  var targetControllerMatch = filterControllerIndex || 0;
+
+  for (i = 0; i < controllers.length; i++) {
+    controller = controllers[i];
+    // Determine if the controller ID matches our criteria
+    if (filterIdPrefix && controller.id.indexOf(filterIdPrefix) === -1) { continue; }
+    if (!filterIdPrefix && controller.id !== filterIdExact) { continue; }
+
+    // If the hand filter and controller handedness are defined we compare them.
+    if (filterHand && controller.hand && filterHand !== controller.hand) { continue; }
+
+    // If we have detected an unhanded controller and the component was asking for a particular hand,
+    // we need to treat the controllers in the array as pairs of controllers. This effectively means that we
+    // need to skip NUM_HANDS matches for each controller number, instead of 1.
+    if (filterHand && !controller.hand) {
+      targetControllerMatch = NUM_HANDS * filterControllerIndex + ((filterHand === DEFAULT_HANDEDNESS) ? 0 : 1);
     }
-    if (isPresent && queryObject.index) {
-      isPresent = index === queryObject.index; // need to use count of gamepads with idPrefix
+
+    // We are looking for the nth occurence of a matching controller (n equals targetControllerMatch).
+    if (matchingControllerOccurence === targetControllerMatch) {
+      return controller;
     }
-    if (isPresent) { break; }
-    if (isPrefixMatch) { index++; } // update count of gamepads with idPrefix
+    ++matchingControllerOccurence;
   }
-  return isPresent;
+  return undefined;
+}
+
+module.exports.findMatchingController = findMatchingController;
+
+/**
+ * Emit specific `moved` event(s) if axes changed based on original axismoved event.
+ *
+ * @param {object} component - Controller component in use.
+ * @param {array} axesMapping - For example `{thumbstick: [0, 1]}`.
+ * @param {object} evt - Event to process.
+ */
+module.exports.emitIfAxesChanged = function (component, axesMapping, evt) {
+  var axes;
+  var buttonTypes;
+  var changed;
+  var detail;
+  var i;
+  var j;
+
+  buttonTypes = Object.keys(axesMapping);
+  for (i = 0; i < buttonTypes.length; i++) {
+    axes = axesMapping[buttonTypes[i]];
+
+    changed = false;
+    for (j = 0; j < axes.length; j++) {
+      if (evt.detail.changed[axes[j]]) { changed = true; }
+    }
+
+    if (!changed) { continue; }
+
+    // Axis has changed. Emit the specific moved event with axis values in detail.
+    detail = {};
+    for (j = 0; j < axes.length; j++) {
+      detail[AXIS_LABELS[j]] = evt.detail.axis[axes[j]];
+    }
+    component.el.emit(buttonTypes[i] + 'moved', detail);
+  }
 };
-
-
-},{}],170:[function(_dereq_,module,exports){
+},{"../constants":89}],170:[function(_dereq_,module,exports){
 /**
  * @author dmarcos / https://github.com/dmarcos
  * @author mrdoob / http://mrdoob.com
