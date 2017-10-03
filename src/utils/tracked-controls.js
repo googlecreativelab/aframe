@@ -3,6 +3,29 @@ var AXIS_LABELS = ['x', 'y', 'z', 'w'];
 var NUM_HANDS = 2; // Number of hands in a pair. Should always be 2.
 
 /**
+* Return enumerated gamepads matching id prefix.
+*
+* @param {object} idPrefix - prefix to match in gamepad id, if any.
+*/
+module.exports.getGamepadsByPrefix = function (idPrefix) {
+  var gamepadsList = [];
+  var gamepad;
+  var gamepads = navigator.getGamepads && navigator.getGamepads();
+  if (!gamepads) { return gamepadsList; }
+
+  for (var i = 0; i < gamepads.length; ++i) {
+    gamepad = gamepads[i];
+    // need to check that gamepad is valid, since browsers may return array of null values
+    if (gamepad) {
+      if (!idPrefix || gamepad.id.indexOf(idPrefix) === 0) {
+        gamepadsList.push(gamepad);
+      }
+    }
+  }
+  return gamepadsList;
+};
+
+/**
  * Called on controller component `.play` handlers.
  * Check if controller matches parameters and inject tracked-controls component.
  * Handle event listeners.
@@ -46,7 +69,7 @@ module.exports.checkControllerPresentAndSetup = function (component, idPrefix, q
  * @param {object} idPrefix - Prefix to match in gamepad id if any.
  * @param {object} queryObject - Map of values to match.
  */
-function isControllerPresent (component, idPrefix, queryObject) {
+function isControllerPresent (component, idPrefix, queryObject ) {
   var gamepads;
   var sceneEl = component.sceneEl;
   var trackedControlsSystem;
@@ -57,7 +80,7 @@ function isControllerPresent (component, idPrefix, queryObject) {
   trackedControlsSystem = sceneEl && sceneEl.systems['tracked-controls'];
   if (!trackedControlsSystem) { return false; }
 
-  gamepads = trackedControlsSystem.controllers;
+  gamepads = trackedControlsSystem.getControllerList();
   if (!gamepads.length) { return false; }
 
   return !!findMatchingController(gamepads, null, idPrefix, queryObject.hand, filterControllerIndex);

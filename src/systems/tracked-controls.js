@@ -1,4 +1,6 @@
 var registerSystem = require('../core/system').registerSystem;
+var trackedControlsUtils = require('../utils/tracked-controls');
+var utils = require('../utils');
 
 /**
  * Tracked controls system.
@@ -14,10 +16,8 @@ module.exports.System = registerSystem('tracked-controls', {
 
     if (!navigator.getVRDisplays) { return; }
 
-    this.sceneEl.addEventListener('enter-vr', function () {
-      navigator.getVRDisplays().then(function (displays) {
-        if (displays.length) { self.vrDisplay = displays[0]; }
-      });
+    navigator.getVRDisplays().then(function (displays) {
+      if (displays.length) { self.vrDisplay = displays[0]; }
     });
   },
 
@@ -29,6 +29,15 @@ module.exports.System = registerSystem('tracked-controls', {
    * Update controller list.
    */
   updateControllerList: function () {
+    var prevCount = this.controllers.length;
+    this.controllers = this.getControllerList();
+
+    if (this.controllers.length !== prevCount) {
+      this.sceneEl.emit('controllersupdated', { controllers: this.controllers });
+    }
+  },
+
+  getControllerList: function() {
     var controllers = this.controllers;
     var gamepad;
     var gamepads;
@@ -47,8 +56,6 @@ module.exports.System = registerSystem('tracked-controls', {
       }
     }
 
-    if (controllers.length !== prevCount) {
-      this.el.emit('controllersupdated', undefined, false);
-    }
+    return this.controllers;
   }
 });

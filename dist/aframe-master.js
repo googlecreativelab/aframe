@@ -75943,7 +75943,7 @@ _dereq_('./core/a-mixin');
 _dereq_('./extras/components/');
 _dereq_('./extras/primitives/');
 
-console.log('A-Frame Version: 0.5.0 (Date 03-10-2017, Commit #e83d220)');
+console.log('A-Frame Version: 0.5.0 (Date 03-10-2017, Commit #005036b)');
 console.log('three Version:', pkg.dependencies['three']);
 console.log('WebVR Polyfill Version:', pkg.dependencies['webvr-polyfill']);
 
@@ -77238,6 +77238,8 @@ function fixVideoAttributes (videoEl) {
 
 },{"../core/system":108,"../lib/three":144,"../utils/":165}],158:[function(_dereq_,module,exports){
 var registerSystem = _dereq_('../core/system').registerSystem;
+var trackedControlsUtils = _dereq_('../utils/tracked-controls');
+var utils = _dereq_('../utils');
 
 /**
  * Tracked controls system.
@@ -77253,10 +77255,8 @@ module.exports.System = registerSystem('tracked-controls', {
 
     if (!navigator.getVRDisplays) { return; }
 
-    this.sceneEl.addEventListener('enter-vr', function () {
-      navigator.getVRDisplays().then(function (displays) {
-        if (displays.length) { self.vrDisplay = displays[0]; }
-      });
+    navigator.getVRDisplays().then(function (displays) {
+      if (displays.length) { self.vrDisplay = displays[0]; }
     });
   },
 
@@ -77268,6 +77268,15 @@ module.exports.System = registerSystem('tracked-controls', {
    * Update controller list.
    */
   updateControllerList: function () {
+    var prevCount = this.controllers.length;
+    this.controllers = this.getControllerList();
+
+    if (this.controllers.length !== prevCount) {
+      this.sceneEl.emit('controllersupdated', { controllers: this.controllers });
+    }
+  },
+
+  getControllerList: function() {
     var controllers = this.controllers;
     var gamepad;
     var gamepads;
@@ -77286,12 +77295,11 @@ module.exports.System = registerSystem('tracked-controls', {
       }
     }
 
-    if (controllers.length !== prevCount) {
-      this.el.emit('controllersupdated', undefined, false);
-    }
+    return this.controllers;
   }
 });
-},{"../core/system":108}],159:[function(_dereq_,module,exports){
+
+},{"../core/system":108,"../utils":165,"../utils/tracked-controls":169}],159:[function(_dereq_,module,exports){
 /**
  * Faster version of Function.prototype.bind
  * @param {Function} fn - Function to wrap.
@@ -78199,6 +78207,29 @@ var AXIS_LABELS = ['x', 'y', 'z', 'w'];
 var NUM_HANDS = 2; // Number of hands in a pair. Should always be 2.
 
 /**
+* Return enumerated gamepads matching id prefix.
+*
+* @param {object} idPrefix - prefix to match in gamepad id, if any.
+*/
+module.exports.getGamepadsByPrefix = function (idPrefix) {
+  var gamepadsList = [];
+  var gamepad;
+  var gamepads = navigator.getGamepads && navigator.getGamepads();
+  if (!gamepads) { return gamepadsList; }
+
+  for (var i = 0; i < gamepads.length; ++i) {
+    gamepad = gamepads[i];
+    // need to check that gamepad is valid, since browsers may return array of null values
+    if (gamepad) {
+      if (!idPrefix || gamepad.id.indexOf(idPrefix) === 0) {
+        gamepadsList.push(gamepad);
+      }
+    }
+  }
+  return gamepadsList;
+};
+
+/**
  * Called on controller component `.play` handlers.
  * Check if controller matches parameters and inject tracked-controls component.
  * Handle event listeners.
@@ -78242,7 +78273,7 @@ module.exports.checkControllerPresentAndSetup = function (component, idPrefix, q
  * @param {object} idPrefix - Prefix to match in gamepad id if any.
  * @param {object} queryObject - Map of values to match.
  */
-function isControllerPresent (component, idPrefix, queryObject) {
+function isControllerPresent (component, idPrefix, queryObject ) {
   var gamepads;
   var sceneEl = component.sceneEl;
   var trackedControlsSystem;
@@ -78253,7 +78284,7 @@ function isControllerPresent (component, idPrefix, queryObject) {
   trackedControlsSystem = sceneEl && sceneEl.systems['tracked-controls'];
   if (!trackedControlsSystem) { return false; }
 
-  gamepads = trackedControlsSystem.controllers;
+  gamepads = trackedControlsSystem.getControllerList();
   if (!gamepads.length) { return false; }
 
   return !!findMatchingController(gamepads, null, idPrefix, queryObject.hand, filterControllerIndex);
@@ -78346,6 +78377,7 @@ module.exports.emitIfAxesChanged = function (component, axesMapping, evt) {
     component.el.emit(buttonTypes[i] + 'moved', detail);
   }
 };
+
 },{"../constants":89}],170:[function(_dereq_,module,exports){
 /**
  * @author dmarcos / https://github.com/dmarcos
