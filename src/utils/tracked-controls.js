@@ -65,7 +65,7 @@ function isControllerPresent (component, idPrefix, queryObject) {
   var gamepad;
   var isPrefixMatch;
   var gamepads;
-  var sceneEl = component.sceneEl;
+  var sceneEl = component.sceneEl || component.el.sceneEl;
 
   var trackedControlsSystem = sceneEl && sceneEl.systems['tracked-controls'];
   if (!trackedControlsSystem) { return isPresent; }

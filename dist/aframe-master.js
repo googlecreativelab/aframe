@@ -29003,7 +29003,7 @@ function rebuildAttribute (attrib, data, itemSize) {
 		this.data = new Uint8Array( this.size * this.size * 3 );
 		this.dataOffsetY = 0;
 
-		this.image = { data: this.data, width: this.size, height: this.size };
+		this.image = { width: this.size, height: this.size };
 
 		this.uploaded = false;
 		this.loaded = false;
@@ -58347,28 +58347,28 @@ TWEEN.Interpolation = {
 
 },{}],48:[function(_dereq_,module,exports){
 module.exports={
-  "_from": "webvr-polyfill@^0.9.35",
-  "_id": "webvr-polyfill@0.9.39",
+  "_from": "webvr-polyfill@^0.9.40",
+  "_id": "webvr-polyfill@0.9.40",
   "_inBundle": false,
-  "_integrity": "sha512-1x11B1IzCS2qegFKxQgEDA+gkZTvChoSYP9a+yinxhYxpiR2197lYYAefHZ3FxZs6FIb+I0pnEYh0EM0sdkZ7A==",
+  "_integrity": "sha512-m7jhJHjFcUYPyPSNeGmly7a2h/cP7bARz0OZMoUn5SueVXEKeZ4P7bzbAUDBDvvqCsa5gHgM3PFIhYe13bqaWw==",
   "_location": "/webvr-polyfill",
   "_phantomChildren": {},
   "_requested": {
     "type": "range",
     "registry": true,
-    "raw": "webvr-polyfill@^0.9.35",
+    "raw": "webvr-polyfill@^0.9.40",
     "name": "webvr-polyfill",
     "escapedName": "webvr-polyfill",
-    "rawSpec": "^0.9.35",
+    "rawSpec": "^0.9.40",
     "saveSpec": null,
-    "fetchSpec": "^0.9.35"
+    "fetchSpec": "^0.9.40"
   },
   "_requiredBy": [
     "/"
   ],
-  "_resolved": "https://registry.npmjs.org/webvr-polyfill/-/webvr-polyfill-0.9.39.tgz",
-  "_shasum": "0193d104924448227b1fcedf44d975eab2e5be21",
-  "_spec": "webvr-polyfill@^0.9.35",
+  "_resolved": "https://registry.npmjs.org/webvr-polyfill/-/webvr-polyfill-0.9.40.tgz",
+  "_shasum": "2cfa0ec0e0cc6ba7238c73a09cba4952fff59a63",
+  "_spec": "webvr-polyfill@^0.9.40",
   "_where": "/Users/jeremyabel/Documents/Workspace/aframe",
   "authors": [
     "Boris Smus <boris@smus.com>",
@@ -58387,7 +58387,7 @@ module.exports={
     "mocha": "^3.2.0",
     "semver": "^5.3.0",
     "webpack": "^2.6.1",
-    "webpack-dev-server": "^2.4.5"
+    "webpack-dev-server": "2.7.1"
   },
   "homepage": "https://github.com/googlevr/webvr-polyfill",
   "keywords": [
@@ -58407,7 +58407,7 @@ module.exports={
     "test": "mocha",
     "watch": "webpack-dev-server"
   },
-  "version": "0.9.39"
+  "version": "0.9.40"
 }
 
 },{}],49:[function(_dereq_,module,exports){
@@ -63577,8 +63577,13 @@ FusionPoseSensor.prototype.updateDeviceMotion_ = function(deviceMotion) {
     this.previousTimestampS = timestampS;
     return;
   }
+
   this.accelerometer.set(-accGravity.x, -accGravity.y, -accGravity.z);
-  this.gyroscope.set(rotRate.alpha, rotRate.beta, rotRate.gamma);
+  if (Util.isR7()) {
+    this.gyroscope.set(-rotRate.beta, rotRate.alpha, rotRate.gamma);
+  } else {
+    this.gyroscope.set(rotRate.alpha, rotRate.beta, rotRate.gamma);
+  }
 
   // With iOS and Firefox Android, rotationRate is reported in degrees,
   // so we first convert to radians.
@@ -63923,8 +63928,16 @@ Util.isFirefoxAndroid = (function() {
   };
 })();
 
+Util.isR7 = (function() {
+  var isR7 = navigator.userAgent.indexOf('R7 Build') !== -1;
+  return function() {
+    return isR7;
+  };
+})();
+
 Util.isLandscapeMode = function() {
-  return (window.orientation == 90 || window.orientation == -90);
+  var rtn = (window.orientation == 90 || window.orientation == -90);
+  return Util.isR7() ? !rtn : rtn;
 };
 
 // Helper method to validate the time steps of sensor timestamps.
@@ -65358,10 +65371,10 @@ module.exports={
     "present": "0.0.6",
     "promise-polyfill": "^3.1.0",
     "style-attr": "^1.0.2",
-    "three": "googlecreativelab/three.js#r84a-mod",
+    "three": "googlecreativelab/three.js#r84b-mod",
     "three-bmfont-text": "^2.1.0",
     "tween.js": "^15.0.0",
-    "webvr-polyfill": "^0.9.35"
+    "webvr-polyfill": "^0.9.40"
   },
   "devDependencies": {
     "browserify": "^13.1.0",
@@ -76902,7 +76915,7 @@ _dereq_('./core/a-mixin');
 _dereq_('./extras/components/');
 _dereq_('./extras/primitives/');
 
-console.log('A-Frame Version: 0.6.0 (Date 05-10-2017, Commit #34d1988)');
+console.log('A-Frame Version: 0.6.0 (Date 12-10-2017, Commit #45a18c8)');
 console.log('three Version:', pkg.dependencies['three']);
 console.log('WebVR Polyfill Version:', pkg.dependencies['webvr-polyfill']);
 
@@ -79451,7 +79464,7 @@ function isControllerPresent (component, idPrefix, queryObject) {
   var gamepad;
   var isPrefixMatch;
   var gamepads;
-  var sceneEl = component.sceneEl;
+  var sceneEl = component.sceneEl || component.el.sceneEl;
 
   var trackedControlsSystem = sceneEl && sceneEl.systems['tracked-controls'];
   if (!trackedControlsSystem) { return isPresent; }
