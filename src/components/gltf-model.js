@@ -1,5 +1,5 @@
 var registerComponent = require('../core/component').registerComponent;
-var THREE = require('../lib/three');
+// var THREE = require('../lib/three');
 var utils = require('../utils/');
 var warn = utils.debug('components:gltf-model:warn');
 
@@ -10,12 +10,12 @@ module.exports.Component = registerComponent('gltf-model', {
   schema: {type: 'model'},
 
   init: function () {
-    var dracoLoader = this.system.getDRACOLoader();
-    this.model = null;
-    this.loader = new THREE.GLTFLoader();
-    if (dracoLoader) {
-      this.loader.setDRACOLoader(dracoLoader);
-    }
+    // var dracoLoader = this.system.getDRACOLoader();
+    // this.model = null;
+    // this.loader = new THREE.GLTFLoader();
+    // if (dracoLoader) {
+    //   this.loader.setDRACOLoader(dracoLoader);
+    // }
   },
 
   update: function () {
