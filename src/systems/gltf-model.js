@@ -1,5 +1,5 @@
 var registerSystem = require('../core/system').registerSystem;
-var THREE = require('../lib/three');
+// var THREE = require('../lib/three');
 
 /**
  * glTF model system.
@@ -15,17 +15,17 @@ module.exports.System = registerSystem('gltf-model', {
   },
 
   init: function () {
-    var path = this.data.dracoDecoderPath;
-    this.dracoLoader = new THREE.DRACOLoader();
-    this.dracoLoader.setDecoderPath(path);
+    // var path = this.data.dracoDecoderPath;
+    // this.dracoLoader = new THREE.DRACOLoader();
+    // this.dracoLoader.setDecoderPath(path);
   },
 
   update: function () {
-    var path;
-    if (this.dracoLoader) { return; }
-    path = this.data.dracoDecoderPath;
-    this.dracoLoader = new THREE.DRACOLoader();
-    this.dracoLoader.setDecoderPath(path);
+    // var path;
+    // if (this.dracoLoader) { return; }
+    // path = this.data.dracoDecoderPath;
+    // this.dracoLoader = new THREE.DRACOLoader();
+    // this.dracoLoader.setDecoderPath(path);
   },
 
   getDRACOLoader: function () {
