@@ -29,7 +29,7 @@ module.exports.Component = registerComponent('tracked-controls', {
     var el = this.el;
     if (el.sceneEl.hasWebXR) {
       el.setAttribute('tracked-controls-webxr', {
-        id: data.id,
+        id: data.id || data.idPrefix,
         hand: data.hand,
         index: data.controller,
         iterateControllerProfiles: data.iterateControllerProfiles
