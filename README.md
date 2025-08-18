@@ -1,3 +1,15 @@
+<table>
+  <tr>
+    <td>
+      This project is no longer actively maintained by the Google Creative Lab but remains here in a read-only Archive mode so that it can continue to assist developers that may find the examples helpful. We aren’t able to address all pull requests or bug reports but outstanding issues will remain in read-only mode for reference purposes. Also, please note that some of the dependencies may not be up to date and there hasn’t been any QA done in a while so your mileage may vary.
+      <br><br>
+      For more details on how Archiving affects Github repositories see <a href="https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-archiving-repositories">this documentation </a>.
+      <br><br>
+      <b>We welcome users to fork this repository</b> should there be more useful, community-driven efforts that can help continue what this project began.
+    </td>
+  </tr>
+</table>
+
 <h1 align="center">A-Frame</h1>
 
 <p align="center"><a href="https://aframe.io" target="_blank"><img width="480" alt="A-Frame" src="https://cloud.githubusercontent.com/assets/674727/21375108/2c10b308-c6e0-11e6-945e-2394beb9a8ed.png"></a></p>
